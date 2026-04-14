@@ -1,53 +1,35 @@
-import { useEffect } from "react";
+/**
+ * Pineapple OS - Main App Router
+ * Routes map to modular pages. Command Center is the landing page.
+ * Layout provides persistent sidebar navigation.
+ */
+
 import "@/App.css";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import axios from "axios";
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
-
-const Home = () => {
-  const helloWorldApi = async () => {
-    try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
-    }
-  };
-
-  useEffect(() => {
-    helloWorldApi();
-  }, []);
-
-  return (
-    <div>
-      <header className="App-header">
-        <a
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
-      </header>
-    </div>
-  );
-};
+import Layout from "./components/Layout";
+import CommandCenter from "./pages/CommandCenter";
+import Dashboard from "./pages/Dashboard";
+import Tasks from "./pages/Tasks";
+import Deals from "./pages/Deals";
+import KnowledgeVault from "./pages/KnowledgeVault";
+import BuildQueue from "./pages/BuildQueue";
+import DailyReview from "./pages/DailyReview";
 
 function App() {
   return (
-    <div className="App">
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route element={<Layout />}>
+          <Route path="/" element={<CommandCenter />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/tasks" element={<Tasks />} />
+          <Route path="/deals" element={<Deals />} />
+          <Route path="/vault" element={<KnowledgeVault />} />
+          <Route path="/build-queue" element={<BuildQueue />} />
+          <Route path="/daily-review" element={<DailyReview />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
   );
 }
 

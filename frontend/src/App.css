@@ -1,34 +1,93 @@
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
+/* Pineapple OS - App Styles */
+
+/* Grid background pattern */
+.app-grid-bg {
+    background-image:
+        linear-gradient(to right, rgba(128, 128, 128, 0.05) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(128, 128, 128, 0.05) 1px, transparent 1px);
+    background-size: 24px 24px;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
+/* Sidebar */
+.sidebar-nav-item {
+    @apply flex items-center gap-3 px-3 py-2.5 text-sm text-zinc-400 transition-colors duration-150;
+}
+.sidebar-nav-item:hover {
+    @apply text-zinc-100 bg-zinc-800/50;
+}
+.sidebar-nav-item.active {
+    @apply text-yellow-500 bg-yellow-500/5 border-r-2 border-yellow-500;
 }
 
-.App-header {
-    background-color: #0f0f10;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
+/* Status badges */
+.badge-status {
+    @apply inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-sm;
+}
+.badge-open { @apply bg-blue-500/10 text-blue-400; }
+.badge-pending { @apply bg-yellow-500/10 text-yellow-400; }
+.badge-closed { @apply bg-zinc-700/50 text-zinc-400; }
+.badge-archived { @apply bg-zinc-800 text-zinc-500; }
+.badge-todo { @apply bg-zinc-700/50 text-zinc-300; }
+.badge-doing { @apply bg-blue-500/10 text-blue-400; }
+.badge-blocked { @apply bg-red-500/10 text-red-400; }
+.badge-done { @apply bg-emerald-500/10 text-emerald-400; }
+.badge-requested { @apply bg-purple-500/10 text-purple-400; }
+.badge-planning { @apply bg-yellow-500/10 text-yellow-400; }
+.badge-building { @apply bg-blue-500/10 text-blue-400; }
+
+/* Priority indicators */
+.priority-dot {
+    @apply w-2 h-2 rounded-full inline-block;
+}
+.priority-low { @apply bg-zinc-500; }
+.priority-medium { @apply bg-blue-400; }
+.priority-high { @apply bg-yellow-400; }
+.priority-critical { @apply bg-red-400; }
+
+/* Table styling */
+.data-table th {
+    @apply text-xs font-medium text-zinc-500 uppercase tracking-wider px-4 py-3 text-left border-b border-zinc-800;
+}
+.data-table td {
+    @apply px-4 py-3 text-sm text-zinc-300 border-b border-zinc-800/50;
+}
+.data-table tr:hover td {
+    @apply bg-zinc-900/30;
 }
 
-.App-link {
-    color: #61dafb;
+/* Command input */
+.command-input-area {
+    @apply bg-zinc-950 border border-zinc-800 p-4 transition-all duration-150;
+}
+.command-input-area:focus-within {
+    @apply border-yellow-500/50;
+    box-shadow: 0 0 20px rgba(234, 179, 8, 0.05);
 }
 
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+/* Card hover */
+.module-card {
+    @apply bg-zinc-900/50 border border-zinc-800 p-5 transition-colors duration-150;
+}
+.module-card:hover {
+    @apply border-zinc-700;
+}
+
+/* Entry type tags */
+.entry-type-tag {
+    @apply inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-sm;
+}
+.entry-type-task { @apply bg-blue-500/10 text-blue-400; }
+.entry-type-deal { @apply bg-emerald-500/10 text-emerald-400; }
+.entry-type-note { @apply bg-zinc-700/50 text-zinc-300; }
+.entry-type-idea { @apply bg-purple-500/10 text-purple-400; }
+.entry-type-trade { @apply bg-yellow-500/10 text-yellow-400; }
+.entry-type-system { @apply bg-red-500/10 text-red-400; }
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+    animation: fadeIn 0.2s ease-out;
 }
