@@ -20,6 +20,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "../components/ui/dialog";
 import { Checkbox } from "../components/ui/checkbox";
 import { toast } from "sonner";
@@ -240,6 +241,7 @@ export default function Tasks() {
         <DialogContent className="bg-zinc-900 border-zinc-800 max-w-md" data-testid="task-form-dialog">
           <DialogHeader>
             <DialogTitle className="text-zinc-100">{editingTask ? "Edit Task" : "New Task"}</DialogTitle>
+            <DialogDescription className="text-zinc-500 text-sm">Fill in the details below.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <Input

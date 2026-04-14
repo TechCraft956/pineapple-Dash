@@ -20,6 +20,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "../components/ui/dialog";
 import { toast } from "sonner";
 import { Plus, Search, Loader2, Pencil, Trash2, FileText, Eye, X } from "lucide-react";
@@ -183,6 +184,7 @@ export default function KnowledgeVault() {
             <>
               <DialogHeader>
                 <DialogTitle className="text-zinc-100">{viewingItem.title}</DialogTitle>
+                <DialogDescription className="text-zinc-500 text-sm">Knowledge vault entry</DialogDescription>
               </DialogHeader>
               <div className="flex items-center gap-2 mb-4">
                 <span className={`badge-status ${categoryColors[viewingItem.category] || ""}`}>{viewingItem.category}</span>
@@ -204,6 +206,7 @@ export default function KnowledgeVault() {
         <DialogContent className="bg-zinc-900 border-zinc-800 max-w-lg" data-testid="vault-form-dialog">
           <DialogHeader>
             <DialogTitle className="text-zinc-100">{editingItem ? "Edit Entry" : "New Entry"}</DialogTitle>
+            <DialogDescription className="text-zinc-500 text-sm">Add knowledge to your vault.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 mt-2">
             <Input data-testid="vault-title-input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Title" className="bg-zinc-950 border-zinc-800 text-zinc-100 placeholder:text-zinc-600" />

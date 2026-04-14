@@ -20,6 +20,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "../components/ui/dialog";
 import { toast } from "sonner";
 import { Plus, Loader2, Pencil, Trash2, X } from "lucide-react";
@@ -212,6 +213,7 @@ export default function BuildQueue() {
         <DialogContent className="bg-zinc-900 border-zinc-800 max-w-lg" data-testid="build-form-dialog">
           <DialogHeader>
             <DialogTitle className="text-zinc-100">{editingItem ? "Edit Item" : "New Build Queue Item"}</DialogTitle>
+            <DialogDescription className="text-zinc-500 text-sm">Track a planned upgrade or module.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 mt-2">
             <Input data-testid="build-title-input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Title" className="bg-zinc-950 border-zinc-800 text-zinc-100 placeholder:text-zinc-600" />

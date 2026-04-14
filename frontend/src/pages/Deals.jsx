@@ -20,6 +20,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "../components/ui/dialog";
 import { toast } from "sonner";
 import { Plus, Search, Loader2, Pencil, Trash2, TrendingUp, TrendingDown } from "lucide-react";
@@ -216,6 +217,7 @@ export default function Deals() {
         <DialogContent className="bg-zinc-900 border-zinc-800 max-w-lg" data-testid="deal-form-dialog">
           <DialogHeader>
             <DialogTitle className="text-zinc-100">{editingDeal ? "Edit Deal" : "New Deal"}</DialogTitle>
+            <DialogDescription className="text-zinc-500 text-sm">Enter deal details. Profit and ROI are auto-calculated.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 mt-2">
             <Input data-testid="deal-title-input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Deal title" className="bg-zinc-950 border-zinc-800 text-zinc-100 placeholder:text-zinc-600" />
