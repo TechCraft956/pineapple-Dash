@@ -1,0 +1,157 @@
+{
+  "project_name": "Pineapple OS",
+  "theme": "DARK",
+  "archetype": "Archetype 4 (Swiss & High-Contrast) + Retro-Futurism (Terminal)",
+  "aesthetic_description": "Clean dark mode, minimalist professional, operator/hacker console style. High data density, functional beauty, no flashy effects. Focus on clarity, reliability, and speed.",
+  "colors": {
+    "background": {
+      "default": "#09090b",
+      "card": "#18181b",
+      "input": "#000000",
+      "console": "#050505"
+    },
+    "text": {
+      "primary": "#f4f4f5",
+      "secondary": "#a1a1aa",
+      "tertiary": "#71717a",
+      "accent": "#eab308"
+    },
+    "border": {
+      "default": "#27272a",
+      "subtle": "#27272a80",
+      "focus": "#eab308"
+    },
+    "primary": {
+      "DEFAULT": "#eab308",
+      "foreground": "#09090b",
+      "hover": "#ca8a04"
+    },
+    "status": {
+      "success": "#10b981",
+      "warning": "#f59e0b",
+      "error": "#ef4444",
+      "info": "#3b82f6"
+    }
+  },
+  "typography": {
+    "fonts": {
+      "heading": "JetBrains Mono",
+      "body": "IBM Plex Sans",
+      "mono": "JetBrains Mono"
+    },
+    "rules": {
+      "h1": "text-2xl sm:text-3xl font-mono tracking-tighter uppercase font-bold",
+      "h2": "text-xl sm:text-2xl font-mono tracking-tight",
+      "h3": "text-lg font-mono tracking-tight",
+      "body": "text-sm text-secondary leading-relaxed font-sans",
+      "mono_data": "text-sm font-mono tracking-tight",
+      "labels": "text-xs font-mono uppercase tracking-[0.1em] text-tertiary"
+    }
+  },
+  "surfaces": {
+    "cards": {
+      "style": "Technical Grid / Control Room",
+      "background": "bg-zinc-900/50",
+      "border": "border border-zinc-800",
+      "border_radius": "rounded-none",
+      "shadow": "shadow-none",
+      "hover": "hover:border-zinc-700 transition-colors"
+    },
+    "command_input": {
+      "background": "bg-black",
+      "border": "border border-zinc-700 focus-within:border-yellow-500",
+      "shadow": "shadow-[0_0_15px_rgba(234,179,8,0.1)] focus-within:shadow-[0_0_20px_rgba(234,179,8,0.2)]"
+    },
+    "glassmorphism": "Not recommended for this archetype. Stick to solid dark grays and stark borders."
+  },
+  "layout_and_spacing": {
+    "philosophy": "Grid-based, dense, high utility. Everything aligned on a strict modular grid.",
+    "dashboard_grid": "grid-cols-1 md:grid-cols-4 gap-4",
+    "padding": {
+      "container": "p-6 md:p-8",
+      "card": "p-5"
+    },
+    "alignment": "Left-align data. Right-align numbers/metrics in tables."
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-yellow-500 text-black font-mono uppercase tracking-widest text-xs px-4 py-2 rounded-none hover:bg-yellow-400 transition-colors",
+      "secondary": "bg-zinc-900 border border-zinc-800 text-zinc-300 font-mono uppercase tracking-widest text-xs px-4 py-2 rounded-none hover:bg-zinc-800 hover:text-white transition-colors"
+    },
+    "inputs": {
+      "style": "bg-black border border-zinc-800 rounded-none text-zinc-100 font-sans p-3 focus:ring-1 focus:ring-yellow-500 focus:border-yellow-500 focus:outline-none placeholder:text-zinc-600"
+    },
+    "tables": {
+      "header": "text-xs font-mono text-zinc-500 uppercase tracking-wider border-b border-zinc-800 pb-2",
+      "row": "border-b border-zinc-800/50 hover:bg-zinc-900/30 transition-colors py-3",
+      "cell": "text-sm text-zinc-300"
+    },
+    "badges": {
+      "style": "px-2 py-0.5 text-[10px] font-mono uppercase border rounded-none",
+      "variants": {
+        "success": "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+        "warning": "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
+        "error": "bg-red-500/10 text-red-400 border-red-500/20",
+        "neutral": "bg-zinc-800 text-zinc-400 border-zinc-700"
+      }
+    }
+  },
+  "motion": {
+    "transitions": "Fast and snappy. duration-150 ease-out.",
+    "hover": "Subtle border color changes and text brightness increases. No scaling or bouncing."
+  },
+  "icons": {
+    "library": "@phosphor-icons/react",
+    "style": "Weight: 'regular' or 'light'. Size: 16px to 20px. Monotone.",
+    "installation": "yarn add @phosphor-icons/react"
+  },
+  "media": {
+    "images": [],
+    "background_css": "bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]",
+    "notes": "Rely entirely on typography, data visualization, and spacing. No stock photos."
+  },
+  "testing": {
+    "rules": "All interactive elements MUST include a data-testid attribute in kebab-case, role-based."
+  },
+  "pages_and_modules": {
+    "command_center": {
+      "layout": "Centralized, dominant view. A large input area mimicking a terminal.",
+      "features": ["Large textarea/input prefixed with '>'", "Tagging system using '#' inline", "Type selector (Task, Deal, Note) via hotkeys or small command bar buttons", "Recent entries feed below with monospace timestamps"]
+    },
+    "dashboard": {
+      "layout": "MODE B: The Control Room Grid. 4 columns.",
+      "features": ["Top row: Summary metric cards (border-collapse style)", "Middle row: Activity Feed (col-span-2), Priority Tasks (col-span-2)", "Bottom row: Daily snapshot / charts (col-span-4)"]
+    },
+    "deals": {
+      "layout": "Dense data table. Hide non-essential columns on smaller screens.",
+      "features": ["Auto-calculated columns for ROI", "Status badges", "Sticky header"]
+    },
+    "tasks": {
+      "layout": "Compact list view.",
+      "features": ["Checkbox on left", "Title and Due Date", "Priority indicator dot (Red/Yellow/Blue)"]
+    },
+    "knowledge_vault": {
+      "layout": "Sidebar (Categories/Tags) + Main Content (Markdown Editor/Viewer).",
+      "features": ["Prose typography for readability (IBM Plex Sans)", "Code block syntax highlighting"]
+    },
+    "build_queue": {
+      "layout": "Kanban or tabular list.",
+      "features": ["Priority sorting", "Status pipelines (Requested, Planning, Building, Done)"]
+    },
+    "daily_review": {
+      "layout": "Timeline view with vertical dashed lines.",
+      "features": ["Chronological list of the day's entries", "End-of-day reflection text area"]
+    }
+  },
+  "instructions_to_main_agent": [
+    "Install and configure Tailwind CSS and Shadcn UI. Keep borders square (rounded-none).",
+    "Install Google Fonts: JetBrains Mono and IBM Plex Sans.",
+    "Use Phosphor Icons (@phosphor-icons/react).",
+    "Build the Command Center as the root route ('/'). It is the primary interaction point.",
+    "Ensure the layout has a persistent sidebar or top navigation bar for switching between modules.",
+    "Implement a clean, fast data store (e.g., SQLite via Prisma, or local storage if frontend-only, but problem statement implies backend is needed. Keep models aligned with the requested fields.)",
+    "Ensure all forms and buttons have data-testid attributes.",
+    "Do not add complex auth. Assume a single-tenant/single-user environment.",
+    "Apply the background_css utility class to the main app wrapper for a subtle hacker grid."
+  ]
+}
