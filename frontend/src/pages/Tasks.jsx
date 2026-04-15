@@ -25,6 +25,8 @@ import {
 import { Checkbox } from "../components/ui/checkbox";
 import { toast } from "sonner";
 import { Plus, Search, Loader2, Pencil, Trash2, X } from "lucide-react";
+import ExportButtons from "../components/ExportButtons";
+import EntityLinks from "../components/EntityLinks";
 
 const STATUSES = ["todo", "doing", "blocked", "done"];
 const PRIORITIES = ["low", "medium", "high", "critical"];
@@ -144,13 +146,16 @@ export default function Tasks() {
           <h1 className="text-2xl font-semibold text-zinc-100 tracking-tight" data-testid="tasks-title">Tasks</h1>
           <p className="text-sm text-zinc-500 mt-1">{tasks.length} task{tasks.length !== 1 ? "s" : ""}</p>
         </div>
-        <Button
-          data-testid="add-task-btn"
-          onClick={() => { resetForm(); setShowForm(true); }}
-          className="bg-yellow-500 hover:bg-yellow-400 text-zinc-950 text-xs font-medium h-8"
-        >
-          <Plus size={14} /> <span className="ml-1">Add Task</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <ExportButtons module="tasks" />
+          <Button
+            data-testid="add-task-btn"
+            onClick={() => { resetForm(); setShowForm(true); }}
+            className="bg-yellow-500 hover:bg-yellow-400 text-zinc-950 text-xs font-medium h-8"
+          >
+            <Plus size={14} /> <span className="ml-1">Add Task</span>
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}

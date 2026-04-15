@@ -10,10 +10,14 @@ MongoDB is used via motor (async driver).
 """
 
 from fastapi import FastAPI, APIRouter, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
+import io
+import csv
+import json
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
@@ -62,6 +66,26 @@ async def log_activity(action: str, module: str, entity_id: str, title: str):
     }
     await db.activity_log.insert_one(doc)
 
+# Map of entity types to their collection names and title fields
+ENTITY_COLLECTIONS = {
+    "tasks": {"collection": "tasks", "title_field": "title"},
+    "deals": {"collection": "deals", "title_field": "title"},
+    "knowledge": {"collection": "knowledge", "title_field": "title"},
+    "build_queue": {"collection": "build_queue", "title_field": "title"},
+    "infrastructure": {"collection": "infrastructure", "title_field": "service_name"},
+    "commands": {"collection": "commands", "title_field": "content"},
+}
+
+async def get_entity_title(entity_type: str, entity_id: str) -> str:
+    """Get the display title for any entity."""
+    info = ENTITY_COLLECTIONS.get(entity_type)
+    if not info:
+        return "Unknown"
+    doc = await db[info["collection"]].find_one({"id": entity_id}, {"_id": 0, info["title_field"]: 1})
+    if not doc:
+        return "Deleted"
+    return doc.get(info["title_field"], "Untitled")
+
 
 # =============================================================================
 # PYDANTIC MODELS - Shared conventions across all entities
@@ -70,8 +94,10 @@ async def log_activity(action: str, module: str, entity_id: str, title: str):
 # --- Commands ---
 class CommandCreate(BaseModel):
     content: str
-    entry_type: str = "note"  # task, deal, note, idea, trade, system
+    entry_type: str = "note"  # task, deal, note, idea, trade, system, build, infrastructure
     tags: List[str] = []
+    route_to_entity: bool = False  # If true, also creates the entity in its module
+    entity_data: Optional[dict] = None  # Extra data for entity creation
 
 class CommandResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -202,6 +228,86 @@ class BuildQueueResponse(BaseModel):
     created_at: str
     updated_at: str
 
+# --- Infrastructure Registry ---
+class InfrastructureCreate(BaseModel):
+    service_name: str
+    friendly_name: str = ""
+    category: str = "app"  # app, api, db, agent, proxy, model, automation
+    runtime: str = "local"  # local, docker, emergent, vps
+    environment: str = "dev"  # dev, staging, prod
+    host_machine: str = ""
+    internal_hostname: str = ""
+    internal_port: Optional[int] = None
+    external_port: Optional[int] = None
+    url: str = ""
+    docker_compose_project: str = ""
+    docker_network: str = ""
+    repo_path: str = ""
+    healthcheck_url: str = ""
+    status: str = "unknown"  # running, stopped, unknown, broken
+    notes: str = ""
+    tags: List[str] = []
+
+class InfrastructureUpdate(BaseModel):
+    service_name: Optional[str] = None
+    friendly_name: Optional[str] = None
+    category: Optional[str] = None
+    runtime: Optional[str] = None
+    environment: Optional[str] = None
+    host_machine: Optional[str] = None
+    internal_hostname: Optional[str] = None
+    internal_port: Optional[int] = None
+    external_port: Optional[int] = None
+    url: Optional[str] = None
+    docker_compose_project: Optional[str] = None
+    docker_network: Optional[str] = None
+    repo_path: Optional[str] = None
+    healthcheck_url: Optional[str] = None
+    status: Optional[str] = None
+    notes: Optional[str] = None
+    tags: Optional[List[str]] = None
+
+class InfrastructureResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    service_name: str
+    friendly_name: str
+    category: str
+    runtime: str
+    environment: str
+    host_machine: str
+    internal_hostname: str
+    internal_port: Optional[int]
+    external_port: Optional[int]
+    url: str
+    docker_compose_project: str
+    docker_network: str
+    repo_path: str
+    healthcheck_url: str
+    status: str
+    notes: str
+    tags: List[str]
+    created_at: str
+    updated_at: str
+
+# --- Entity Links ---
+class EntityLinkCreate(BaseModel):
+    source_type: str  # tasks, deals, knowledge, build_queue, infrastructure, commands
+    source_id: str
+    target_type: str
+    target_id: str
+
+class EntityLinkResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    source_type: str
+    source_id: str
+    source_title: str
+    target_type: str
+    target_id: str
+    target_title: str
+    created_at: str
+
 # --- Daily Review ---
 class DailyReviewUpdate(BaseModel):
     next_actions: str = ""
@@ -214,7 +320,8 @@ class DailyReviewUpdate(BaseModel):
 
 @api_router.post("/commands", response_model=CommandResponse)
 async def create_command(data: CommandCreate):
-    """Create a new command entry from the Command Center."""
+    """Create a new command entry from the Command Center.
+    If route_to_entity is True, also creates the entity in its target module."""
     doc = {
         "id": new_id(),
         "content": data.content,
@@ -222,6 +329,62 @@ async def create_command(data: CommandCreate):
         "tags": data.tags,
         "created_at": now_iso()
     }
+    routed_entity_id = None
+
+    # Route to entity if requested
+    if data.route_to_entity and data.entry_type in ("task", "deal", "build", "infrastructure"):
+        now = now_iso()
+        extra = data.entity_data or {}
+        if data.entry_type == "task":
+            entity_doc = {
+                "id": new_id(), "title": data.content, "description": extra.get("description", ""),
+                "status": extra.get("status", "todo"), "priority": extra.get("priority", "medium"),
+                "due_date": extra.get("due_date"), "tags": data.tags,
+                "created_at": now, "updated_at": now
+            }
+            await db.tasks.insert_one(entity_doc)
+            await log_activity("created", "tasks", entity_doc["id"], data.content[:80])
+            routed_entity_id = entity_doc["id"]
+        elif data.entry_type == "deal":
+            entity_doc = {
+                "id": new_id(), "title": data.content, "category": extra.get("category", ""),
+                "buy_price": extra.get("buy_price", 0), "sell_price": extra.get("sell_price", 0),
+                "fees": extra.get("fees", 0), "status": extra.get("status", "open"),
+                "priority": extra.get("priority", "medium"), "notes": extra.get("notes", ""),
+                "tags": data.tags, "created_at": now, "updated_at": now
+            }
+            entity_doc = calc_deal_fields(entity_doc)
+            await db.deals.insert_one(entity_doc)
+            await log_activity("created", "deals", entity_doc["id"], data.content[:80])
+            routed_entity_id = entity_doc["id"]
+        elif data.entry_type == "build":
+            entity_doc = {
+                "id": new_id(), "title": data.content, "description": extra.get("description", ""),
+                "status": extra.get("status", "requested"), "priority": extra.get("priority", "medium"),
+                "rationale": extra.get("rationale", ""), "tags": data.tags,
+                "created_at": now, "updated_at": now
+            }
+            await db.build_queue.insert_one(entity_doc)
+            await log_activity("created", "build_queue", entity_doc["id"], data.content[:80])
+            routed_entity_id = entity_doc["id"]
+        elif data.entry_type == "infrastructure":
+            entity_doc = {
+                "id": new_id(), "service_name": data.content, "friendly_name": extra.get("friendly_name", ""),
+                "category": extra.get("category", "app"), "runtime": extra.get("runtime", "local"),
+                "environment": extra.get("environment", "dev"), "host_machine": extra.get("host_machine", ""),
+                "internal_hostname": extra.get("internal_hostname", ""), "internal_port": extra.get("internal_port"),
+                "external_port": extra.get("external_port"), "url": extra.get("url", ""),
+                "docker_compose_project": extra.get("docker_compose_project", ""),
+                "docker_network": extra.get("docker_network", ""), "repo_path": extra.get("repo_path", ""),
+                "healthcheck_url": extra.get("healthcheck_url", ""), "status": extra.get("status", "unknown"),
+                "notes": extra.get("notes", ""), "tags": data.tags,
+                "created_at": now, "updated_at": now
+            }
+            await db.infrastructure.insert_one(entity_doc)
+            await log_activity("created", "infrastructure", entity_doc["id"], data.content[:80])
+            routed_entity_id = entity_doc["id"]
+
+    doc["routed_entity_id"] = routed_entity_id
     await db.commands.insert_one(doc)
     await log_activity("created", "commands", doc["id"], data.content[:80])
     return CommandResponse(**doc)
@@ -538,6 +701,282 @@ async def delete_build_queue_item(item_id: str):
 
 
 # =============================================================================
+# API ROUTES - Infrastructure Registry
+# =============================================================================
+
+@api_router.post("/infrastructure", response_model=InfrastructureResponse)
+async def create_infrastructure(data: InfrastructureCreate):
+    """Create a new infrastructure record."""
+    now = now_iso()
+    doc = {
+        "id": new_id(),
+        "service_name": data.service_name,
+        "friendly_name": data.friendly_name,
+        "category": data.category,
+        "runtime": data.runtime,
+        "environment": data.environment,
+        "host_machine": data.host_machine,
+        "internal_hostname": data.internal_hostname,
+        "internal_port": data.internal_port,
+        "external_port": data.external_port,
+        "url": data.url,
+        "docker_compose_project": data.docker_compose_project,
+        "docker_network": data.docker_network,
+        "repo_path": data.repo_path,
+        "healthcheck_url": data.healthcheck_url,
+        "status": data.status,
+        "notes": data.notes,
+        "tags": data.tags,
+        "created_at": now,
+        "updated_at": now,
+    }
+    await db.infrastructure.insert_one(doc)
+    await log_activity("created", "infrastructure", doc["id"], data.service_name)
+    return InfrastructureResponse(**doc)
+
+@api_router.get("/infrastructure", response_model=List[InfrastructureResponse])
+async def get_infrastructure(
+    category: Optional[str] = None,
+    runtime: Optional[str] = None,
+    environment: Optional[str] = None,
+    status: Optional[str] = None,
+    search: Optional[str] = None,
+):
+    """Get infrastructure records with optional filters."""
+    query = {}
+    if category:
+        query["category"] = category
+    if runtime:
+        query["runtime"] = runtime
+    if environment:
+        query["environment"] = environment
+    if status:
+        query["status"] = status
+    if search:
+        query["$or"] = [
+            {"service_name": {"$regex": search, "$options": "i"}},
+            {"friendly_name": {"$regex": search, "$options": "i"}},
+        ]
+    docs = await db.infrastructure.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return docs
+
+@api_router.get("/infrastructure/{item_id}", response_model=InfrastructureResponse)
+async def get_infrastructure_item(item_id: str):
+    doc = await db.infrastructure.find_one({"id": item_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Infrastructure record not found")
+    return doc
+
+@api_router.put("/infrastructure/{item_id}", response_model=InfrastructureResponse)
+async def update_infrastructure(item_id: str, data: InfrastructureUpdate):
+    updates = {k: v for k, v in data.model_dump().items() if v is not None}
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    updates["updated_at"] = now_iso()
+    result = await db.infrastructure.update_one({"id": item_id}, {"$set": updates})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Infrastructure record not found")
+    doc = await db.infrastructure.find_one({"id": item_id}, {"_id": 0})
+    await log_activity("updated", "infrastructure", item_id, doc.get("service_name", ""))
+    return doc
+
+@api_router.delete("/infrastructure/{item_id}")
+async def delete_infrastructure(item_id: str):
+    doc = await db.infrastructure.find_one({"id": item_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Infrastructure record not found")
+    await db.infrastructure.delete_one({"id": item_id})
+    # Also clean up any links referencing this entity
+    await db.entity_links.delete_many({"$or": [
+        {"source_type": "infrastructure", "source_id": item_id},
+        {"target_type": "infrastructure", "target_id": item_id},
+    ]})
+    await log_activity("deleted", "infrastructure", item_id, doc["service_name"])
+    return {"status": "deleted"}
+
+
+# =============================================================================
+# API ROUTES - Entity Links
+# =============================================================================
+
+@api_router.post("/links", response_model=EntityLinkResponse)
+async def create_entity_link(data: EntityLinkCreate):
+    """Create a link between two entities."""
+    # Validate both entities exist
+    source_title = await get_entity_title(data.source_type, data.source_id)
+    target_title = await get_entity_title(data.target_type, data.target_id)
+    if source_title == "Deleted" or target_title == "Deleted":
+        raise HTTPException(status_code=404, detail="One or both entities not found")
+    # Check for duplicate
+    existing = await db.entity_links.find_one({
+        "source_type": data.source_type, "source_id": data.source_id,
+        "target_type": data.target_type, "target_id": data.target_id
+    })
+    if existing:
+        raise HTTPException(status_code=400, detail="Link already exists")
+    doc = {
+        "id": new_id(),
+        "source_type": data.source_type,
+        "source_id": data.source_id,
+        "source_title": source_title,
+        "target_type": data.target_type,
+        "target_id": data.target_id,
+        "target_title": target_title,
+        "created_at": now_iso(),
+    }
+    await db.entity_links.insert_one(doc)
+    await log_activity("linked", "entity_links", doc["id"], f"{source_title} → {target_title}")
+    return EntityLinkResponse(**doc)
+
+@api_router.get("/links", response_model=List[EntityLinkResponse])
+async def get_entity_links(
+    entity_type: Optional[str] = None,
+    entity_id: Optional[str] = None,
+):
+    """Get links for a specific entity (both directions)."""
+    if entity_type and entity_id:
+        query = {"$or": [
+            {"source_type": entity_type, "source_id": entity_id},
+            {"target_type": entity_type, "target_id": entity_id},
+        ]}
+    else:
+        query = {}
+    docs = await db.entity_links.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return docs
+
+@api_router.delete("/links/{link_id}")
+async def delete_entity_link(link_id: str):
+    result = await db.entity_links.delete_one({"id": link_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Link not found")
+    return {"status": "deleted"}
+
+
+# =============================================================================
+# API ROUTES - Global Search
+# =============================================================================
+
+@api_router.get("/search")
+async def global_search(q: str = Query(..., min_length=1)):
+    """Search across all entity collections."""
+    regex = {"$regex": q, "$options": "i"}
+    results = []
+
+    # Search tasks
+    tasks = await db.tasks.find(
+        {"$or": [{"title": regex}, {"description": regex}]}, {"_id": 0}
+    ).to_list(20)
+    for t in tasks:
+        results.append({"type": "tasks", "id": t["id"], "title": t["title"],
+                        "subtitle": t.get("status", ""), "priority": t.get("priority", ""),
+                        "updated_at": t.get("updated_at", t.get("created_at", ""))})
+
+    # Search deals
+    deals = await db.deals.find(
+        {"$or": [{"title": regex}, {"notes": regex}]}, {"_id": 0}
+    ).to_list(20)
+    for d in deals:
+        results.append({"type": "deals", "id": d["id"], "title": d["title"],
+                        "subtitle": d.get("status", ""), "priority": d.get("priority", ""),
+                        "updated_at": d.get("updated_at", d.get("created_at", ""))})
+
+    # Search knowledge
+    knowledge = await db.knowledge.find(
+        {"$or": [{"title": regex}, {"content": regex}]}, {"_id": 0}
+    ).to_list(20)
+    for k in knowledge:
+        results.append({"type": "knowledge", "id": k["id"], "title": k["title"],
+                        "subtitle": k.get("category", ""), "priority": "",
+                        "updated_at": k.get("updated_at", k.get("created_at", ""))})
+
+    # Search build queue
+    builds = await db.build_queue.find(
+        {"$or": [{"title": regex}, {"description": regex}]}, {"_id": 0}
+    ).to_list(20)
+    for b in builds:
+        results.append({"type": "build_queue", "id": b["id"], "title": b["title"],
+                        "subtitle": b.get("status", ""), "priority": b.get("priority", ""),
+                        "updated_at": b.get("updated_at", b.get("created_at", ""))})
+
+    # Search infrastructure
+    infra = await db.infrastructure.find(
+        {"$or": [{"service_name": regex}, {"friendly_name": regex}, {"notes": regex}]}, {"_id": 0}
+    ).to_list(20)
+    for i in infra:
+        results.append({"type": "infrastructure", "id": i["id"], "title": i["service_name"],
+                        "subtitle": f"{i.get('runtime', '')} / {i.get('environment', '')}",
+                        "priority": "", "updated_at": i.get("updated_at", i.get("created_at", ""))})
+
+    # Search commands
+    commands = await db.commands.find(
+        {"content": regex}, {"_id": 0}
+    ).to_list(20)
+    for c in commands:
+        results.append({"type": "commands", "id": c["id"], "title": c["content"][:100],
+                        "subtitle": c.get("entry_type", ""), "priority": "",
+                        "updated_at": c.get("created_at", "")})
+
+    # Sort by updated_at descending
+    results.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
+    return {"query": q, "total": len(results), "results": results[:50]}
+
+
+# =============================================================================
+# API ROUTES - Export
+# =============================================================================
+
+@api_router.get("/export/json")
+async def export_json(module: Optional[str] = None):
+    """Export all data or a specific module as JSON."""
+    export_data = {}
+    modules_to_export = [module] if module else ["tasks", "deals", "knowledge", "build_queue", "infrastructure", "commands"]
+    for m in modules_to_export:
+        collection_name = m
+        if m == "build_queue":
+            collection_name = "build_queue"
+        docs = await db[collection_name].find({}, {"_id": 0}).to_list(10000)
+        export_data[m] = docs
+    # Include links
+    if not module:
+        links = await db.entity_links.find({}, {"_id": 0}).to_list(10000)
+        export_data["entity_links"] = links
+    json_str = json.dumps(export_data, indent=2, default=str)
+    return StreamingResponse(
+        io.BytesIO(json_str.encode()),
+        media_type="application/json",
+        headers={"Content-Disposition": f"attachment; filename=pineapple-export-{datetime.now(timezone.utc).strftime('%Y%m%d')}.json"}
+    )
+
+@api_router.get("/export/csv/{module}")
+async def export_csv(module: str):
+    """Export a specific module as CSV."""
+    valid_modules = ["tasks", "deals", "knowledge", "build_queue", "infrastructure", "commands"]
+    if module not in valid_modules:
+        raise HTTPException(status_code=400, detail=f"Invalid module. Choose from: {valid_modules}")
+    docs = await db[module].find({}, {"_id": 0}).to_list(10000)
+    if not docs:
+        raise HTTPException(status_code=404, detail="No data to export")
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=docs[0].keys())
+    writer.writeheader()
+    for doc in docs:
+        # Convert lists to comma-separated strings for CSV
+        row = {}
+        for k, v in doc.items():
+            if isinstance(v, list):
+                row[k] = ", ".join(str(x) for x in v)
+            else:
+                row[k] = v
+        writer.writerow(row)
+    output.seek(0)
+    return StreamingResponse(
+        io.BytesIO(output.getvalue().encode()),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={module}-export-{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"}
+    )
+
+
+# =============================================================================
 # API ROUTES - Daily Review
 # =============================================================================
 
@@ -596,7 +1035,7 @@ async def save_daily_review(data: DailyReviewUpdate):
 
 @api_router.get("/dashboard")
 async def get_dashboard():
-    """Aggregated dashboard data: counts, recent activity, priority items."""
+    """Aggregated dashboard data: counts, recent activity, priority items, computed insights."""
     # Counts
     task_counts = {
         "total": await db.tasks.count_documents({}),
@@ -643,6 +1082,51 @@ async def get_dashboard():
         "timestamp": {"$gte": today_start, "$lte": today_end}
     })
 
+    # =========================================================================
+    # COMPUTED INTELLIGENCE
+    # =========================================================================
+    stale_threshold = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+
+    # Stale tasks (not done, not updated in 7+ days)
+    stale_tasks = await db.tasks.find(
+        {"status": {"$ne": "done"}, "updated_at": {"$lt": stale_threshold}},
+        {"_id": 0}
+    ).sort("updated_at", 1).to_list(10)
+
+    # Stale deals (open/pending, not updated in 7+ days)
+    stale_deals = await db.deals.find(
+        {"status": {"$in": ["open", "pending"]}, "updated_at": {"$lt": stale_threshold}},
+        {"_id": 0}
+    ).sort("updated_at", 1).to_list(10)
+
+    # Today queue (tasks due today or overdue, not done)
+    today_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today_queue = await db.tasks.find(
+        {"status": {"$ne": "done"}, "due_date": {"$lte": today_date, "$ne": None}},
+        {"_id": 0}
+    ).sort("due_date", 1).to_list(20)
+
+    # Build queue urgency (high/critical, not done)
+    build_urgent = await db.build_queue.find(
+        {"priority": {"$in": ["high", "critical"]}, "status": {"$ne": "done"}},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(10)
+
+    # Infrastructure health summary
+    infra_total = await db.infrastructure.count_documents({})
+    infra_running = await db.infrastructure.count_documents({"status": "running"})
+    infra_stopped = await db.infrastructure.count_documents({"status": "stopped"})
+    infra_broken = await db.infrastructure.count_documents({"status": "broken"})
+    infra_unknown = await db.infrastructure.count_documents({"status": "unknown"})
+
+    system_health = {
+        "total": infra_total,
+        "running": infra_running,
+        "stopped": infra_stopped,
+        "broken": infra_broken,
+        "unknown": infra_unknown,
+    }
+
     return {
         "task_counts": task_counts,
         "deal_counts": deal_counts,
@@ -652,7 +1136,13 @@ async def get_dashboard():
         "priority_tasks": priority_tasks,
         "priority_deals": priority_deals,
         "recent_commands": recent_commands,
-        "today_activity_count": today_activities
+        "today_activity_count": today_activities,
+        # Computed intelligence
+        "stale_tasks": stale_tasks,
+        "stale_deals": stale_deals,
+        "today_queue": today_queue,
+        "build_urgent": build_urgent,
+        "system_health": system_health,
     }
 
 
@@ -718,12 +1208,21 @@ async def seed_data():
         {"id": new_id(), "title": "Mobile Companion View", "description": "Optimized mobile layout for on-the-go access", "status": "requested", "priority": "low", "rationale": "Quick access to tasks and deals from phone", "tags": ["mobile", "ux"], "created_at": now, "updated_at": now},
     ]
 
+    # Seed infrastructure
+    infrastructure = [
+        {"id": new_id(), "service_name": "pineapple-api", "friendly_name": "Pineapple OS API", "category": "api", "runtime": "docker", "environment": "prod", "host_machine": "main-server", "internal_hostname": "pineapple-api", "internal_port": 8001, "external_port": 443, "url": "https://api.pineapple.local", "docker_compose_project": "pineapple-os", "docker_network": "pineapple-net", "repo_path": "/app/backend", "healthcheck_url": "https://api.pineapple.local/api/", "status": "running", "notes": "Main API service", "tags": ["core"], "created_at": now, "updated_at": now},
+        {"id": new_id(), "service_name": "pineapple-frontend", "friendly_name": "Pineapple OS Frontend", "category": "app", "runtime": "docker", "environment": "prod", "host_machine": "main-server", "internal_hostname": "pineapple-frontend", "internal_port": 3000, "external_port": 443, "url": "https://pineapple.local", "docker_compose_project": "pineapple-os", "docker_network": "pineapple-net", "repo_path": "/app/frontend", "healthcheck_url": "https://pineapple.local", "status": "running", "notes": "React SPA frontend", "tags": ["core"], "created_at": now, "updated_at": now},
+        {"id": new_id(), "service_name": "mongodb", "friendly_name": "MongoDB Database", "category": "db", "runtime": "docker", "environment": "prod", "host_machine": "main-server", "internal_hostname": "mongodb", "internal_port": 27017, "external_port": None, "url": "", "docker_compose_project": "pineapple-os", "docker_network": "pineapple-net", "repo_path": "", "healthcheck_url": "", "status": "running", "notes": "Primary datastore", "tags": ["core", "database"], "created_at": now, "updated_at": now},
+        {"id": new_id(), "service_name": "nginx-proxy", "friendly_name": "Nginx Reverse Proxy", "category": "proxy", "runtime": "docker", "environment": "prod", "host_machine": "main-server", "internal_hostname": "nginx", "internal_port": 80, "external_port": 443, "url": "", "docker_compose_project": "pineapple-os", "docker_network": "pineapple-net", "repo_path": "", "healthcheck_url": "", "status": "running", "notes": "SSL termination + routing", "tags": ["networking"], "created_at": now, "updated_at": now},
+    ]
+
     # Insert all seed data
     await db.commands.insert_many(commands)
     await db.tasks.insert_many(tasks)
     await db.deals.insert_many(deals)
     await db.knowledge.insert_many(knowledge)
     await db.build_queue.insert_many(build_queue)
+    await db.infrastructure.insert_many(infrastructure)
 
     # Log seeding activity
     await log_activity("seeded", "system", "seed", "Database seeded with sample data")

@@ -13,6 +13,7 @@ import Tasks from "./pages/Tasks";
 import Deals from "./pages/Deals";
 import KnowledgeVault from "./pages/KnowledgeVault";
 import BuildQueue from "./pages/BuildQueue";
+import InfrastructureRegistry from "./pages/InfrastructureRegistry";
 import DailyReview from "./pages/DailyReview";
 
 function App() {
@@ -26,6 +27,7 @@ function App() {
           <Route path="/deals" element={<Deals />} />
           <Route path="/vault" element={<KnowledgeVault />} />
           <Route path="/build-queue" element={<BuildQueue />} />
+          <Route path="/infrastructure" element={<InfrastructureRegistry />} />
           <Route path="/daily-review" element={<DailyReview />} />
         </Route>
       </Routes>

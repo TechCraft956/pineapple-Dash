@@ -2,6 +2,7 @@
  * Pineapple OS - Layout Component
  * Persistent sidebar navigation + main content area.
  * Sidebar shows module icons and labels, highlights active route.
+ * Includes global search (Ctrl+K).
  */
 
 import { NavLink, Outlet } from "react-router-dom";
@@ -13,11 +14,13 @@ import {
   BookOpen,
   Layers,
   CalendarCheck,
+  Server,
   Menu,
   X,
 } from "lucide-react";
 import { useState } from "react";
 import { Toaster } from "../components/ui/sonner";
+import GlobalSearch from "./GlobalSearch";
 
 const NAV_ITEMS = [
   { path: "/", label: "Command Center", icon: Terminal },
@@ -26,6 +29,7 @@ const NAV_ITEMS = [
   { path: "/deals", label: "Deals", icon: Handshake },
   { path: "/vault", label: "Knowledge Vault", icon: BookOpen },
   { path: "/build-queue", label: "Build Queue", icon: Layers },
+  { path: "/infrastructure", label: "Infrastructure", icon: Server },
   { path: "/daily-review", label: "Daily Review", icon: CalendarCheck },
 ];
 
@@ -65,11 +69,16 @@ export default function Layout() {
           <h1 className="text-base font-semibold text-zinc-100 tracking-tight" data-testid="app-title">
             <span className="text-yellow-500">P</span>ineapple OS
           </h1>
-          <p className="text-[11px] text-zinc-500 mt-0.5">Operator Workspace v1</p>
+          <p className="text-[11px] text-zinc-500 mt-0.5">Operator System v2</p>
+        </div>
+
+        {/* Global Search */}
+        <div className="px-3 py-2.5">
+          <GlobalSearch />
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 py-3 overflow-y-auto" data-testid="sidebar-nav">
+        <nav className="flex-1 py-1 overflow-y-auto" data-testid="sidebar-nav">
           {NAV_ITEMS.map((item) => (
             <NavLink
               key={item.path}
@@ -89,7 +98,7 @@ export default function Layout() {
 
         {/* Footer */}
         <div className="px-4 py-3 border-t border-zinc-800">
-          <p className="text-[10px] text-zinc-600">v1.0.0 / modular foundation</p>
+          <p className="text-[10px] text-zinc-600">v2.0.0 / operator system</p>
         </div>
       </aside>
 

@@ -82,6 +82,8 @@
 .entry-type-idea { @apply bg-purple-500/10 text-purple-400; }
 .entry-type-trade { @apply bg-yellow-500/10 text-yellow-400; }
 .entry-type-system { @apply bg-red-500/10 text-red-400; }
+.entry-type-build { @apply bg-orange-500/10 text-orange-400; }
+.entry-type-infra { @apply bg-cyan-500/10 text-cyan-400; }
 
 /* Animations */
 @keyframes fadeIn {

@@ -56,6 +56,22 @@ export const buildQueueApi = {
   remove: (id) => api.delete(`/build-queue/${id}`),
 };
 
+// --- Infrastructure Registry ---
+export const infrastructureApi = {
+  create: (data) => api.post("/infrastructure", data),
+  list: (params) => api.get("/infrastructure", { params }),
+  get: (id) => api.get(`/infrastructure/${id}`),
+  update: (id, data) => api.put(`/infrastructure/${id}`, data),
+  remove: (id) => api.delete(`/infrastructure/${id}`),
+};
+
+// --- Entity Links ---
+export const linksApi = {
+  create: (data) => api.post("/links", data),
+  list: (params) => api.get("/links", { params }),
+  remove: (id) => api.delete(`/links/${id}`),
+};
+
 // --- Daily Review ---
 export const dailyReviewApi = {
   get: () => api.get("/daily-review"),
@@ -70,6 +86,17 @@ export const dashboardApi = {
 // --- Activity ---
 export const activityApi = {
   list: (limit = 50) => api.get("/activity", { params: { limit } }),
+};
+
+// --- Global Search ---
+export const searchApi = {
+  search: (q) => api.get("/search", { params: { q } }),
+};
+
+// --- Export ---
+export const exportApi = {
+  json: (module) => api.get("/export/json", { params: module ? { module } : {}, responseType: "blob" }),
+  csv: (module) => api.get(`/export/csv/${module}`, { responseType: "blob" }),
 };
 
 // --- Seed ---

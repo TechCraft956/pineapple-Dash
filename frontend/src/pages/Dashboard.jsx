@@ -1,11 +1,13 @@
 /**
- * Dashboard - Control room overview for Pineapple OS
- * Shows summary cards, activity feed, priority items, and today snapshot.
+ * Dashboard - Intelligent control room for Pineapple OS
+ * Shows summary cards, computed insights: priority items, stale items,
+ * today queue, build urgency, system health, activity feed.
  */
 
 import { useState, useEffect, useCallback } from "react";
 import { dashboardApi } from "../lib/api";
 import { useNavigate } from "react-router-dom";
+import ExportButtons from "../components/ExportButtons";
 import {
   CheckSquare,
   Handshake,
@@ -15,6 +17,10 @@ import {
   Clock,
   Loader2,
   ArrowRight,
+  Server,
+  Calendar,
+  AlertCircle,
+  Zap,
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -51,7 +57,12 @@ export default function Dashboard() {
     );
   }
 
-  const { task_counts, deal_counts, knowledge_count, build_queue_count, recent_activity, priority_tasks, priority_deals, today_activity_count } = data;
+  const {
+    task_counts, deal_counts, knowledge_count, build_queue_count,
+    recent_activity, priority_tasks, priority_deals, today_activity_count,
+    stale_tasks = [], stale_deals = [], today_queue = [],
+    build_urgent = [], system_health = {},
+  } = data;
 
   const summaryCards = [
     {
@@ -93,6 +104,12 @@ export default function Dashboard() {
     return d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
   };
 
+  const formatDate = (iso) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return d.toLocaleString("en-US", { month: "short", day: "numeric" });
+  };
+
   return (
     <div className="animate-fade-in" data-testid="dashboard-page">
       {/* Header */}
@@ -105,6 +122,7 @@ export default function Dashboard() {
             System overview &middot; {today_activity_count} actions today
           </p>
         </div>
+        <ExportButtons />
       </div>
 
       {/* Summary Cards */}
@@ -127,32 +145,91 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Two column layout: Activity + Priority */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Activity Feed */}
-        <div className="module-card" data-testid="activity-feed">
-          <div className="flex items-center gap-2 mb-4">
-            <Clock size={15} className="text-zinc-500" />
+      {/* System Health Bar */}
+      {system_health.total > 0 && (
+        <div className="module-card mb-6" data-testid="system-health">
+          <div className="flex items-center gap-2 mb-3">
+            <Server size={15} className="text-cyan-400" />
             <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">
-              Recent Activity
+              System Health
             </h2>
+            <button onClick={() => navigate("/infrastructure")} className="ml-auto text-xs text-zinc-600 hover:text-zinc-400 transition-colors">
+              View all &rarr;
+            </button>
           </div>
-          {recent_activity.length === 0 ? (
-            <p className="text-sm text-zinc-500" data-testid="activity-empty">No recent activity</p>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-6 text-sm">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                <span className="text-zinc-300">{system_health.running}</span>
+                <span className="text-zinc-600 text-xs">running</span>
+              </span>
+              {system_health.stopped > 0 && (
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-zinc-500" />
+                  <span className="text-zinc-300">{system_health.stopped}</span>
+                  <span className="text-zinc-600 text-xs">stopped</span>
+                </span>
+              )}
+              {system_health.broken > 0 && (
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-red-400" />
+                  <span className="text-zinc-300">{system_health.broken}</span>
+                  <span className="text-zinc-600 text-xs">broken</span>
+                </span>
+              )}
+              {system_health.unknown > 0 && (
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-yellow-400" />
+                  <span className="text-zinc-300">{system_health.unknown}</span>
+                  <span className="text-zinc-600 text-xs">unknown</span>
+                </span>
+              )}
+            </div>
+            {/* Health bar */}
+            <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden flex">
+              {system_health.running > 0 && (
+                <div className="bg-emerald-500 h-full" style={{ width: `${(system_health.running / system_health.total) * 100}%` }} />
+              )}
+              {system_health.stopped > 0 && (
+                <div className="bg-zinc-500 h-full" style={{ width: `${(system_health.stopped / system_health.total) * 100}%` }} />
+              )}
+              {system_health.broken > 0 && (
+                <div className="bg-red-500 h-full" style={{ width: `${(system_health.broken / system_health.total) * 100}%` }} />
+              )}
+              {system_health.unknown > 0 && (
+                <div className="bg-yellow-500 h-full" style={{ width: `${(system_health.unknown / system_health.total) * 100}%` }} />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Intelligence Row: Today Queue + Priority */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        {/* Today Queue */}
+        <div className="module-card" data-testid="today-queue">
+          <div className="flex items-center gap-2 mb-4">
+            <Calendar size={15} className="text-blue-400" />
+            <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">
+              Today Queue
+            </h2>
+            <span className="text-[11px] text-zinc-600 ml-auto">{today_queue.length} items</span>
+          </div>
+          {today_queue.length === 0 ? (
+            <p className="text-sm text-zinc-600">Nothing due today</p>
           ) : (
-            <div className="space-y-2.5">
-              {recent_activity.slice(0, 10).map((a, i) => (
-                <div key={a.id || i} className="flex items-start gap-3" data-testid={`activity-item-${i}`}>
-                  <div className="w-1.5 h-1.5 rounded-full bg-zinc-600 mt-1.5 shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-zinc-300 truncate">
-                      <span className="text-zinc-500 capitalize">{a.action}</span>{" "}
-                      <span className="text-zinc-500">{a.module}</span>{" "}
-                      &middot; {a.title}
-                    </p>
-                    <p className="text-[11px] text-zinc-600 font-mono">{formatTime(a.timestamp)}</p>
-                  </div>
-                </div>
+            <div className="space-y-2">
+              {today_queue.slice(0, 8).map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => navigate("/tasks")}
+                  className="w-full text-left flex items-center gap-3 py-2 px-3 bg-zinc-800/30 hover:bg-zinc-800/60 transition-colors"
+                >
+                  <span className={`priority-dot priority-${t.priority}`} />
+                  <span className="text-sm text-zinc-300 flex-1 truncate">{t.title}</span>
+                  <span className="text-[10px] text-zinc-600">{t.due_date}</span>
+                </button>
               ))}
             </div>
           )}
@@ -163,15 +240,14 @@ export default function Dashboard() {
           <div className="flex items-center gap-2 mb-4">
             <AlertTriangle size={15} className="text-yellow-500" />
             <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">
-              Priority Items
+              High Priority
             </h2>
           </div>
-
           {priority_tasks.length === 0 && priority_deals.length === 0 ? (
-            <p className="text-sm text-zinc-500" data-testid="priority-empty">No high priority items</p>
+            <p className="text-sm text-zinc-600" data-testid="priority-empty">No high priority items</p>
           ) : (
             <div className="space-y-2">
-              {priority_tasks.map((t) => (
+              {priority_tasks.slice(0, 5).map((t) => (
                 <button
                   key={t.id}
                   onClick={() => navigate("/tasks")}
@@ -183,7 +259,7 @@ export default function Dashboard() {
                   <span className={`badge-status badge-${t.status}`}>{t.status}</span>
                 </button>
               ))}
-              {priority_deals.map((d) => (
+              {priority_deals.slice(0, 5).map((d) => (
                 <button
                   key={d.id}
                   onClick={() => navigate("/deals")}
@@ -198,6 +274,105 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Intelligence Row 2: Stale Items + Build Urgency */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        {/* Stale Items */}
+        <div className="module-card" data-testid="stale-items">
+          <div className="flex items-center gap-2 mb-4">
+            <AlertCircle size={15} className="text-orange-400" />
+            <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">
+              Stale Items
+            </h2>
+            <span className="text-[11px] text-zinc-600 ml-auto">7+ days idle</span>
+          </div>
+          {stale_tasks.length === 0 && stale_deals.length === 0 ? (
+            <p className="text-sm text-zinc-600">Everything is fresh</p>
+          ) : (
+            <div className="space-y-2">
+              {stale_tasks.slice(0, 5).map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => navigate("/tasks")}
+                  className="w-full text-left flex items-center gap-3 py-2 px-3 bg-zinc-800/30 hover:bg-zinc-800/60 transition-colors"
+                >
+                  <CheckSquare size={13} className="text-blue-400" />
+                  <span className="text-sm text-zinc-300 flex-1 truncate">{t.title}</span>
+                  <span className="text-[10px] text-zinc-600">{formatDate(t.updated_at)}</span>
+                </button>
+              ))}
+              {stale_deals.slice(0, 5).map((d) => (
+                <button
+                  key={d.id}
+                  onClick={() => navigate("/deals")}
+                  className="w-full text-left flex items-center gap-3 py-2 px-3 bg-zinc-800/30 hover:bg-zinc-800/60 transition-colors"
+                >
+                  <Handshake size={13} className="text-emerald-400" />
+                  <span className="text-sm text-zinc-300 flex-1 truncate">{d.title}</span>
+                  <span className="text-[10px] text-zinc-600">{formatDate(d.updated_at)}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Build Queue Urgency */}
+        <div className="module-card" data-testid="build-urgency">
+          <div className="flex items-center gap-2 mb-4">
+            <Zap size={15} className="text-yellow-400" />
+            <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">
+              Build Urgency
+            </h2>
+            <span className="text-[11px] text-zinc-600 ml-auto">{build_urgent.length} urgent</span>
+          </div>
+          {build_urgent.length === 0 ? (
+            <p className="text-sm text-zinc-600">No urgent builds</p>
+          ) : (
+            <div className="space-y-2">
+              {build_urgent.slice(0, 5).map((b) => (
+                <button
+                  key={b.id}
+                  onClick={() => navigate("/build-queue")}
+                  className="w-full text-left flex items-center gap-3 py-2 px-3 bg-zinc-800/30 hover:bg-zinc-800/60 transition-colors"
+                >
+                  <span className={`priority-dot priority-${b.priority}`} />
+                  <span className="text-sm text-zinc-300 flex-1 truncate">{b.title}</span>
+                  <span className={`badge-status badge-${b.status}`}>{b.status}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Activity Feed */}
+      <div className="module-card" data-testid="activity-feed">
+        <div className="flex items-center gap-2 mb-4">
+          <Clock size={15} className="text-zinc-500" />
+          <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">
+            Recent Activity
+          </h2>
+        </div>
+        {recent_activity.length === 0 ? (
+          <p className="text-sm text-zinc-500" data-testid="activity-empty">No recent activity</p>
+        ) : (
+          <div className="space-y-2.5">
+            {recent_activity.slice(0, 10).map((a, i) => (
+              <div key={a.id || i} className="flex items-start gap-3" data-testid={`activity-item-${i}`}>
+                <div className="w-1.5 h-1.5 rounded-full bg-zinc-600 mt-1.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-zinc-300 truncate">
+                    <span className="text-zinc-500 capitalize">{a.action}</span>{" "}
+                    <span className="text-zinc-500">{a.module}</span>{" "}
+                    &middot; {a.title}
+                  </p>
+                  <p className="text-[11px] text-zinc-600 font-mono">{formatTime(a.timestamp)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
