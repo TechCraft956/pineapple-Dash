@@ -8,9 +8,39 @@ Pineapple OS is a command hub that lets you capture inputs, manage deals and tas
 
 ## Quick Start
 
+### Prerequisites
+- [Docker](https://docs.docker.com/get-docker/) and Docker Compose
+
+### Run with Docker (recommended)
+
+```bash
+# Clone and enter the repo
+git clone https://github.com/TechCraft956/pineapple-Dash.git
+cd pineapple-Dash
+
+# Start everything (MongoDB + Backend + Frontend)
+docker compose up --build
+```
+
+That's it. Open **http://localhost:3000** in your browser.
+
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8001/api
+- MongoDB: localhost:27017
+
+To stop: `Ctrl+C` then `docker compose down`
+
+To stop and **delete all data**: `docker compose down -v`
+
+### Run without Docker
+
 The app runs on:
 - **Frontend**: React + Tailwind CSS + shadcn/ui (port 3000)
 - **Backend**: FastAPI + MongoDB (port 8001)
+
+1. Start MongoDB locally on port 27017
+2. Backend: `cd backend && cp .env.example .env && pip install -r requirements.txt && uvicorn server:app --host 0.0.0.0 --port 8001`
+3. Frontend: `cd frontend && cp .env.example .env && yarn install && yarn start`
 
 ### First Launch
 On first visit, the app automatically seeds the database with sample data so you can explore all modules immediately.
@@ -34,21 +64,24 @@ On first visit, the app automatically seeds the database with sample data so you
 ## Project Structure
 
 ```
-/app/
+/
+├── docker-compose.yml         # One-command startup
 ├── backend/
-│   ├── server.py          # FastAPI app - all models and API routes
-│   ├── .env               # Environment variables (MONGO_URL, DB_NAME)
-│   └── requirements.txt   # Python dependencies
+│   ├── Dockerfile             # Backend container
+│   ├── server.py              # FastAPI app - all models and API routes
+│   ├── .env.example           # Environment template
+│   └── requirements.txt       # Python dependencies
 ├── frontend/
+│   ├── Dockerfile             # Frontend container
 │   ├── src/
-│   │   ├── App.js         # Router setup
-│   │   ├── App.css        # App-level styles
-│   │   ├── index.css      # Global styles, CSS variables, dark theme
+│   │   ├── App.js             # Router setup
+│   │   ├── App.css            # App-level styles
+│   │   ├── index.css          # Global styles, CSS variables, dark theme
 │   │   ├── lib/
-│   │   │   └── api.js     # Centralized API client
+│   │   │   └── api.js         # Centralized API client
 │   │   ├── components/
-│   │   │   ├── Layout.jsx # Sidebar navigation + main content
-│   │   │   └── ui/        # shadcn/ui components
+│   │   │   ├── Layout.jsx     # Sidebar navigation + main content
+│   │   │   └── ui/            # shadcn/ui components
 │   │   └── pages/
 │   │       ├── CommandCenter.jsx
 │   │       ├── Dashboard.jsx
@@ -57,12 +90,12 @@ On first visit, the app automatically seeds the database with sample data so you
 │   │       ├── KnowledgeVault.jsx
 │   │       ├── BuildQueue.jsx
 │   │       └── DailyReview.jsx
-│   ├── .env               # Frontend env (REACT_APP_BACKEND_URL)
-│   └── package.json       # Node dependencies
+│   ├── .env.example           # Frontend env template
+│   └── package.json           # Node dependencies
 ├── docs/
-│   ├── ARCHITECTURE.md    # Architecture overview
-│   └── PSEUDOCODE.md      # Core flow pseudocode
-└── README.md              # This file
+│   ├── ARCHITECTURE.md        # Architecture overview
+│   └── PSEUDOCODE.md          # Core flow pseudocode
+└── README.md                  # This file
 ```
 
 ---
