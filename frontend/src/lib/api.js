@@ -77,4 +77,9 @@ export const seedApi = {
   seed: () => api.post("/seed"),
 };
 
+// --- Shared Feed ---
+export const feedApi = {
+  apps: () => api.get("/feed/apps"),
+};
+
 export default api;

@@ -13,6 +13,7 @@ from fastapi import FastAPI, APIRouter, HTTPException, Query
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+import json
 import os
 import logging
 from pathlib import Path
@@ -654,6 +655,27 @@ async def get_dashboard():
         "recent_commands": recent_commands,
         "today_activity_count": today_activities
     }
+
+
+# =============================================================================
+# API ROUTES - Shared Feed (read-only visibility into mini-app status)
+# =============================================================================
+
+_FEED_FILE = Path(os.environ.get(
+    "SHARED_FEED_FILE",
+    str(Path(__file__).parents[2] / "shared-feed" / "feed.json")
+))
+
+@api_router.get("/feed/apps")
+async def get_feed_apps():
+    """Return live status of all mini-apps from the shared feed."""
+    try:
+        if not _FEED_FILE.exists():
+            return {}
+        text = _FEED_FILE.read_text(encoding="utf-8").strip()
+        return json.loads(text) if text else {}
+    except Exception:
+        return {}
 
 
 # =============================================================================

@@ -14,10 +14,13 @@ services:
     restart: unless-stopped
     ports:
       - "8001:8001"
+    volumes:
+      - ../shared-feed:/shared-feed
     environment:
       - MONGO_URL=mongodb://mongo:27017
       - DB_NAME=pineapple_os
       - CORS_ORIGINS=http://localhost:3000
+      - SHARED_FEED_FILE=/shared-feed/feed.json
     depends_on:
       - mongo
 

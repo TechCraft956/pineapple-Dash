@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
-import { dashboardApi } from "../lib/api";
+import { dashboardApi, feedApi } from "../lib/api";
 import { useNavigate } from "react-router-dom";
 import {
   CheckSquare,
@@ -15,17 +15,23 @@ import {
   Clock,
   Loader2,
   ArrowRight,
+  Activity,
 } from "lucide-react";
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
+  const [feed, setFeed] = useState({});
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   const load = useCallback(async () => {
     try {
-      const res = await dashboardApi.get();
-      setData(res.data);
+      const [dashRes, feedRes] = await Promise.allSettled([
+        dashboardApi.get(),
+        feedApi.apps(),
+      ]);
+      if (dashRes.status === "fulfilled") setData(dashRes.value.data);
+      if (feedRes.status === "fulfilled") setFeed(feedRes.value.data || {});
     } catch (err) {
       console.error("Failed to load dashboard:", err);
     } finally {
@@ -126,6 +132,47 @@ export default function Dashboard() {
           </button>
         ))}
       </div>
+
+      {/* Connected Apps — rendered only when feed has data */}
+      {Object.keys(feed).length > 0 && (
+        <div className="mb-4 module-card" data-testid="connected-apps">
+          <div className="flex items-center gap-2 mb-4">
+            <Activity size={15} className="text-zinc-500" />
+            <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">
+              Connected Apps
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {Object.entries(feed).map(([appId, app]) => {
+              const dotColor = { idle: "bg-emerald-400", running: "bg-yellow-400", error: "bg-red-400" }[app.status] ?? "bg-zinc-500";
+              const labelColor = { idle: "text-emerald-400", running: "text-yellow-400", error: "text-red-400" }[app.status] ?? "text-zinc-500";
+              return (
+                <div key={appId} className="bg-zinc-800/40 border border-zinc-700/50 p-3 rounded">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${dotColor}`} />
+                    <span className="text-sm font-medium text-zinc-200 flex-1 truncate">{app.app_name}</span>
+                    <span className={`text-[11px] font-mono capitalize ${labelColor}`}>{app.status}</span>
+                  </div>
+                  <p className="text-[11px] text-zinc-600 font-mono mb-2">{formatTime(app.last_updated)}</p>
+                  {Object.keys(app.metrics || {}).length > 0 && (
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 mb-2">
+                      {Object.entries(app.metrics).map(([k, v]) => (
+                        <span key={k} className="text-[11px]">
+                          <span className="text-zinc-600">{k.replace(/_/g, " ")}</span>{" "}
+                          <span className="text-zinc-300">{v}</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {(app.recent_events || []).slice(-2).map((evt, i) => (
+                    <p key={i} className="text-[11px] text-zinc-500 truncate">{evt}</p>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Two column layout: Activity + Priority */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
