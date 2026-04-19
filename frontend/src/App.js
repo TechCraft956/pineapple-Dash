@@ -7,6 +7,12 @@
 import "@/App.css";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Layout from "./components/Layout";
+import Overview from "./pages/Overview";
+import Agents from "./pages/Agents";
+import Opportunities from "./pages/Opportunities";
+import Approvals from "./pages/Approvals";
+import Executions from "./pages/Executions";
+import SystemHealth from "./pages/SystemHealth";
 import CommandCenter from "./pages/CommandCenter";
 import Dashboard from "./pages/Dashboard";
 import Tasks from "./pages/Tasks";
@@ -20,8 +26,14 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route element={<Layout />}>
-          <Route path="/" element={<CommandCenter />} />
+          <Route path="/" element={<Overview />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/agents" element={<Agents />} />
+          <Route path="/opportunities" element={<Opportunities />} />
+          <Route path="/approvals" element={<Approvals />} />
+          <Route path="/executions" element={<Executions />} />
+          <Route path="/system-health" element={<SystemHealth />} />
+          <Route path="/command-center" element={<CommandCenter />} />
           <Route path="/tasks" element={<Tasks />} />
           <Route path="/deals" element={<Deals />} />
           <Route path="/vault" element={<KnowledgeVault />} />

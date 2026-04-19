@@ -65,6 +65,7 @@ export const dailyReviewApi = {
 // --- Dashboard ---
 export const dashboardApi = {
   get: () => api.get("/dashboard"),
+  overview: () => api.get("/operator/overview"),
 };
 
 // --- Activity ---

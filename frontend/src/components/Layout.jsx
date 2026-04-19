@@ -13,6 +13,10 @@ import {
   BookOpen,
   Layers,
   CalendarCheck,
+  Activity,
+  ShieldCheck,
+  Workflow,
+  Cpu,
   Menu,
   X,
 } from "lucide-react";
@@ -20,8 +24,14 @@ import { useState } from "react";
 import { Toaster } from "../components/ui/sonner";
 
 const NAV_ITEMS = [
-  { path: "/", label: "Command Center", icon: Terminal },
-  { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { path: "/", label: "Overview", icon: LayoutDashboard },
+  { path: "/agents", label: "Agents", icon: Cpu },
+  { path: "/opportunities", label: "Opportunities", icon: Handshake },
+  { path: "/approvals", label: "Approvals", icon: ShieldCheck },
+  { path: "/executions", label: "Executions", icon: Workflow },
+  { path: "/system-health", label: "System Health", icon: Activity },
+  { path: "/command-center", label: "Command Center", icon: Terminal },
+  { path: "/dashboard", label: "Legacy Dashboard", icon: LayoutDashboard },
   { path: "/tasks", label: "Tasks", icon: CheckSquare },
   { path: "/deals", label: "Deals", icon: Handshake },
   { path: "/vault", label: "Knowledge Vault", icon: BookOpen },
@@ -65,7 +75,7 @@ export default function Layout() {
           <h1 className="text-base font-semibold text-zinc-100 tracking-tight" data-testid="app-title">
             <span className="text-yellow-500">P</span>ineapple OS
           </h1>
-          <p className="text-[11px] text-zinc-500 mt-0.5">Operator Workspace v1</p>
+          <p className="text-[11px] text-zinc-500 mt-0.5">Unified operator command surface</p>
         </div>
 
         {/* Navigation */}
@@ -89,7 +99,7 @@ export default function Layout() {
 
         {/* Footer */}
         <div className="px-4 py-3 border-t border-zinc-800">
-          <p className="text-[10px] text-zinc-600">v1.0.0 / modular foundation</p>
+          <p className="text-[10px] text-zinc-600">v1.0.0 / canonical runtime mode</p>
         </div>
       </aside>
 

@@ -20,6 +20,10 @@ services:
       - "8001:8001"
     env_file:
       - ./backend/.env.runtime
+    environment:
+      - PINEAPPLE_RUNTIME_ROOT=/runtime/pineapple-ops-runtime
+    volumes:
+      - /Users/DdyFngr/Desktop/Projects/pineapple-ops-runtime:/runtime/pineapple-ops-runtime:ro
     depends_on:
       mongo:
         condition: service_healthy
