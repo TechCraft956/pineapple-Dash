@@ -1,35 +1,51 @@
-version: "3.8"
-
 services:
   mongo:
     image: mongo:7
     restart: unless-stopped
     ports:
-      - "27017:27017"
+      - "27018:27017"
     volumes:
       - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand({ ping: 1 })"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
 
   backend:
     build: ./backend
     restart: unless-stopped
     ports:
       - "8001:8001"
-    environment:
-      - MONGO_URL=mongodb://mongo:27017
-      - DB_NAME=pineapple_os
-      - CORS_ORIGINS=http://localhost:3000
+    env_file:
+      - ./backend/.env.runtime
     depends_on:
-      - mongo
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/api/', timeout=5).read()\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
 
   frontend:
     build: ./frontend
     restart: unless-stopped
     ports:
       - "3000:3000"
-    environment:
-      - REACT_APP_BACKEND_URL=http://localhost:8001
+    env_file:
+      - ./frontend/.env.runtime
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:3000/health/ready | grep -q '\"ready\":true' || wget -q -O - http://127.0.0.1:3000/ | grep -q '<!doctype html>'"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
 
 volumes:
   mongo_data:
