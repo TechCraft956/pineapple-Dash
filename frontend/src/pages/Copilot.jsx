@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { pineappleApi } from "../lib/api";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 function PriorityPill({ priority }) {
   const styles = {
@@ -35,8 +36,18 @@ export default function Copilot() {
     return <div className="flex items-center gap-2 text-zinc-500 py-20 justify-center"><Loader2 size={18} className="animate-spin" /> Loading copilot...</div>;
   }
 
-  const tasks = overview?.generated_tasks || [];
+  const tasks = overview?.task_lifecycle || [];
   const queue = overview?.pineapple_queue?.items || [];
+
+  const updateTask = async (taskId, status) => {
+    try {
+      await pineappleApi.updateTask(taskId, { status });
+      toast.success(`Task marked ${status}`);
+      await load();
+    } catch {
+      toast.error("Failed to update task");
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -56,7 +67,13 @@ export default function Copilot() {
                   <PriorityPill priority={task.priority} />
                 </div>
                 <div className="text-zinc-500 mt-1">{task.reason}</div>
-                <div className="text-zinc-400 mt-2">Impact: {task.expected_outcome} · Confidence: {Math.round((task.confidence || 0) * 100)}%</div>
+                <div className="text-zinc-400 mt-2">Impact: {task.expected_outcome} · Confidence: {Math.round((task.confidence || 0) * 100)}% · Status: {task.status}</div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button className="rounded bg-zinc-800 px-2.5 py-1 text-xs text-zinc-200 hover:bg-zinc-700" onClick={() => updateTask(task.task_id, "in_progress")}>Execute</button>
+                  <button className="rounded bg-zinc-800 px-2.5 py-1 text-xs text-zinc-200 hover:bg-zinc-700" onClick={() => updateTask(task.task_id, "done")}>Done</button>
+                  <button className="rounded bg-zinc-800 px-2.5 py-1 text-xs text-zinc-200 hover:bg-zinc-700" onClick={() => updateTask(task.task_id, "deferred")}>Snooze</button>
+                  <button className="rounded bg-zinc-800 px-2.5 py-1 text-xs text-zinc-200 hover:bg-zinc-700" onClick={() => updateTask(task.task_id, "ignored")}>Ignore</button>
+                </div>
               </div>
             ))}
             {!tasks.length && <div className="text-zinc-500 text-sm">No generated actions yet.</div>}

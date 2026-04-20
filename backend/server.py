@@ -19,7 +19,7 @@ import logging
 import subprocess
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Literal
 import uuid
 from datetime import datetime, timezone, timedelta
 
@@ -37,7 +37,9 @@ DECISION_INBOX_FILE = STATE_DIR / "decision-inbox.json"
 APPROVALS_FILE = STATE_DIR / "approvals.json"
 PINEAPPLE_QUEUE_FILE = STATE_DIR / "pineapple-queue.json"
 PINEAPPLE_ORDER_FILE = STATE_DIR / "pineapple-os-order.json"
+TASK_LIFECYCLE_FILE = STATE_DIR / "task-lifecycle.json"
 GENERATED_TASKS_FILE = STATE_DIR / "generated-tasks.json"
+LOCAL_TASK_LIFECYCLE_FILE = ROOT_DIR / ".runtime-cache" / "task-lifecycle.json"
 CANONICAL_STATE_CONTRACT_FILE = STATE_DIR / "canonical-state-contract.json"
 CANONICAL_OWNERSHIP_FILE = STATE_DIR / "ownership-map.json"
 
@@ -99,6 +101,11 @@ def _read_markdown(path: Path) -> str:
         return path.read_text()
     except Exception:
         return ""
+
+
+def _write_json(path: Path, payload: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2))
 
 
 def _docker_service_rows() -> list[dict]:
@@ -206,6 +213,60 @@ def _persist_generated_tasks(tasks: list[dict]) -> None:
         }, indent=2))
     except OSError:
         logger.warning("generated tasks file is not writable in current runtime mount")
+
+
+def _read_task_lifecycle() -> dict:
+    canonical = _read_json(TASK_LIFECYCLE_FILE, None)
+    if canonical is not None:
+        return canonical
+    return _read_json(LOCAL_TASK_LIFECYCLE_FILE, {"tasks": []})
+
+
+def _persist_task_lifecycle(tasks: list[dict]) -> None:
+    payload = {
+        "generated_at": now_iso(),
+        "count": len(tasks),
+        "tasks": tasks,
+    }
+    try:
+        _write_json(TASK_LIFECYCLE_FILE, payload)
+    except OSError:
+        logger.warning("canonical task lifecycle file is not writable in dash runtime, using local cache")
+        _write_json(LOCAL_TASK_LIFECYCLE_FILE, payload)
+
+
+def _merge_generated_tasks(tasks: list[dict]) -> list[dict]:
+    current = _read_task_lifecycle()
+    existing = {item.get("task_id"): item for item in current.get("tasks", []) if item.get("task_id")}
+    merged = []
+    seen = set()
+    for task in tasks:
+        task_id = task.get("task_id")
+        prior = existing.get(task_id, {})
+        merged_task = {
+            "task_id": task_id,
+            "source": task.get("source"),
+            "action": task.get("action"),
+            "reason": task.get("reason"),
+            "priority": task.get("priority"),
+            "expected_outcome": task.get("expected_outcome"),
+            "confidence": task.get("confidence"),
+            "status": prior.get("status", "pending"),
+            "created_at": prior.get("created_at", task.get("timestamp") or now_iso()),
+            "updated_at": now_iso(),
+            "resolution": prior.get("resolution"),
+            "actual_outcome": prior.get("actual_outcome"),
+            "was_successful": prior.get("was_successful"),
+            "time_to_complete": prior.get("time_to_complete"),
+            "value_generated": prior.get("value_generated"),
+        }
+        merged.append(merged_task)
+        seen.add(task_id)
+    for task_id, prior in existing.items():
+        if task_id not in seen:
+            merged.append(prior)
+    _persist_task_lifecycle(merged)
+    return merged
 
 
 def _generated_tasks(overview: dict, ingestion_records: list[dict]) -> list[dict]:
@@ -354,6 +415,7 @@ def _runtime_overview() -> dict:
         "ingestion_records": list(reversed(ingestion_records[-5:])),
     }
     overview["generated_tasks"] = _generated_tasks(overview, overview["ingestion_records"])
+    overview["task_lifecycle"] = _merge_generated_tasks(overview["generated_tasks"])
     _persist_generated_tasks(overview["generated_tasks"])
     return overview
 
@@ -513,6 +575,15 @@ class BuildQueueResponse(BaseModel):
 class DailyReviewUpdate(BaseModel):
     next_actions: str = ""
     reflections: str = ""
+
+
+class TaskLifecycleUpdate(BaseModel):
+    status: Literal["pending", "in_progress", "done", "ignored", "deferred", "blocked"]
+    resolution: Optional[str] = None
+    actual_outcome: Optional[str] = None
+    was_successful: Optional[bool] = None
+    time_to_complete: Optional[str] = None
+    value_generated: Optional[str] = None
 
 
 # =============================================================================
@@ -954,6 +1025,31 @@ async def get_dashboard():
 @api_router.get("/operator/overview")
 async def get_operator_overview():
     return _runtime_overview()
+
+
+@api_router.put("/operator/tasks/{task_id}")
+async def update_operator_task(task_id: str, data: TaskLifecycleUpdate):
+    current = _read_task_lifecycle()
+    tasks = current.get("tasks", [])
+    for idx, task in enumerate(tasks):
+        if task.get("task_id") != task_id:
+            continue
+        task["status"] = data.status
+        task["updated_at"] = now_iso()
+        if data.resolution is not None:
+            task["resolution"] = data.resolution
+        if data.actual_outcome is not None:
+            task["actual_outcome"] = data.actual_outcome
+        if data.was_successful is not None:
+            task["was_successful"] = data.was_successful
+        if data.time_to_complete is not None:
+            task["time_to_complete"] = data.time_to_complete
+        if data.value_generated is not None:
+            task["value_generated"] = data.value_generated
+        tasks[idx] = task
+        _persist_task_lifecycle(tasks)
+        return task
+    raise HTTPException(status_code=404, detail="Operator task not found")
 
 
 # =============================================================================

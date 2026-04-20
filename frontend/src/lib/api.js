@@ -70,6 +70,7 @@ export const dashboardApi = {
 
 export const pineappleApi = {
   overview: () => api.get("/operator/overview"),
+  updateTask: (taskId, data) => api.put(`/operator/tasks/${taskId}`, data),
 };
 
 // --- Activity ---
