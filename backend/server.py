@@ -35,6 +35,9 @@ EXCEPTIONS_FILE = STATE_DIR / "exception-stream.jsonl"
 BRIEF_FILE = STATE_DIR / "daily-brief.md"
 DECISION_INBOX_FILE = STATE_DIR / "decision-inbox.json"
 APPROVALS_FILE = STATE_DIR / "approvals.json"
+PINEAPPLE_QUEUE_FILE = STATE_DIR / "pineapple-queue.json"
+PINEAPPLE_ORDER_FILE = STATE_DIR / "pineapple-os-order.json"
+GENERATED_TASKS_FILE = STATE_DIR / "generated-tasks.json"
 CANONICAL_STATE_CONTRACT_FILE = STATE_DIR / "canonical-state-contract.json"
 CANONICAL_OWNERSHIP_FILE = STATE_DIR / "ownership-map.json"
 
@@ -193,6 +196,78 @@ def _brief_snapshot() -> dict:
     }
 
 
+def _persist_generated_tasks(tasks: list[dict]) -> None:
+    try:
+        GENERATED_TASKS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        GENERATED_TASKS_FILE.write_text(json.dumps({
+            "generated_at": now_iso(),
+            "count": len(tasks),
+            "tasks": tasks,
+        }, indent=2))
+    except OSError:
+        logger.warning("generated tasks file is not writable in current runtime mount")
+
+
+def _generated_tasks(overview: dict, ingestion_records: list[dict]) -> list[dict]:
+    generated: list[dict] = []
+    now = now_iso()
+
+    service_health = overview.get("service_health") or {}
+    if service_health.get("total_count", 0) > 0 and service_health.get("healthy_count", 0) < service_health.get("total_count", 0):
+        generated.append({
+            "task_id": f"generated-service-health-{service_health.get('healthy_count',0)}",
+            "source": "runtime",
+            "action": "Inspect unhealthy services and restore runtime truth",
+            "reason": service_health.get("summary") or "Service health degraded",
+            "priority": "critical",
+            "expected_outcome": "restore uptime",
+            "confidence": 0.95,
+            "timestamp": now,
+        })
+
+    approvals = overview.get("approvals") or []
+    pending_approvals = [item for item in approvals if item.get("status") == "pending"]
+    if pending_approvals:
+        generated.append({
+            "task_id": f"generated-approvals-{len(pending_approvals)}",
+            "source": "approval",
+            "action": "Review and resolve pending approvals",
+            "reason": f"{len(pending_approvals)} approvals are blocking execution",
+            "priority": "high",
+            "expected_outcome": "unblock execution",
+            "confidence": 0.9,
+            "timestamp": now,
+        })
+
+    top_actions = overview.get("top_actions") or []
+    if not top_actions and overview.get("marketplace", {}).get("alive"):
+        generated.append({
+            "task_id": "generated-marketplace-quality",
+            "source": "runtime",
+            "action": "Repair marketplace ranking quality and pickup-aware scoring",
+            "reason": "Marketplace is alive but top actions are not surfacing clearly",
+            "priority": "high",
+            "expected_outcome": "better opportunity quality",
+            "confidence": 0.87,
+            "timestamp": now,
+        })
+
+    if ingestion_records:
+        latest = ingestion_records[0]
+        generated.append({
+            "task_id": f"generated-ingestion-{latest.get('id','latest')}",
+            "source": "ingestion",
+            "action": "Review newly ingested context and convert it into tasks or decisions",
+            "reason": f"New {latest.get('classification', {}).get('kind', 'unknown')} context was ingested",
+            "priority": "medium",
+            "expected_outcome": "turn context into action",
+            "confidence": 0.78,
+            "timestamp": now,
+        })
+
+    return generated[:5]
+
+
 def _runtime_overview() -> dict:
     service_health = _service_health_summary()
     tasks, active_tasks = _task_snapshots()
@@ -212,7 +287,11 @@ def _runtime_overview() -> dict:
         failure.get("summary") for failure in failures if failure.get("summary")
     )
 
-    return {
+    queue = _read_json(PINEAPPLE_QUEUE_FILE, {})
+    order = _read_json(PINEAPPLE_ORDER_FILE, {})
+    ingestion_records = _read_jsonl(RUNTIME_ROOT / "ingestion" / "index" / "records.jsonl")
+
+    overview = {
         "generated_at": now_iso(),
         "canonical_runtime_root": str(RUNTIME_ROOT),
         "service_health": service_health,
@@ -270,7 +349,13 @@ def _runtime_overview() -> dict:
             "n8n workflows" if not contract.get("n8n") else None,
         ],
         "blocked_items": [item for item in blockers if item],
+        "pineapple_queue": queue,
+        "pineapple_order": order,
+        "ingestion_records": list(reversed(ingestion_records[-5:])),
     }
+    overview["generated_tasks"] = _generated_tasks(overview, overview["ingestion_records"])
+    _persist_generated_tasks(overview["generated_tasks"])
+    return overview
 
 async def log_activity(action: str, module: str, entity_id: str, title: str):
     """Log an activity entry for the activity feed."""

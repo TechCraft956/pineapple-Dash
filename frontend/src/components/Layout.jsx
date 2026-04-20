@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   Workflow,
   Cpu,
+  Sparkles,
   Menu,
   X,
 } from "lucide-react";
@@ -30,6 +31,7 @@ const NAV_ITEMS = [
   { path: "/approvals", label: "Approvals", icon: ShieldCheck },
   { path: "/executions", label: "Executions", icon: Workflow },
   { path: "/system-health", label: "System Health", icon: Activity },
+  { path: "/copilot", label: "Copilot", icon: Sparkles },
   { path: "/command-center", label: "Command Center", icon: Terminal },
   { path: "/dashboard", label: "Legacy Dashboard", icon: LayoutDashboard },
   { path: "/tasks", label: "Tasks", icon: CheckSquare },

@@ -68,6 +68,10 @@ export const dashboardApi = {
   overview: () => api.get("/operator/overview"),
 };
 
+export const pineappleApi = {
+  overview: () => api.get("/operator/overview"),
+};
+
 // --- Activity ---
 export const activityApi = {
   list: (limit = 50) => api.get("/activity", { params: { limit } }),

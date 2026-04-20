@@ -13,6 +13,7 @@ import Opportunities from "./pages/Opportunities";
 import Approvals from "./pages/Approvals";
 import Executions from "./pages/Executions";
 import SystemHealth from "./pages/SystemHealth";
+import Copilot from "./pages/Copilot";
 import CommandCenter from "./pages/CommandCenter";
 import Dashboard from "./pages/Dashboard";
 import Tasks from "./pages/Tasks";
@@ -33,6 +34,7 @@ function App() {
           <Route path="/approvals" element={<Approvals />} />
           <Route path="/executions" element={<Executions />} />
           <Route path="/system-health" element={<SystemHealth />} />
+          <Route path="/copilot" element={<Copilot />} />
           <Route path="/command-center" element={<CommandCenter />} />
           <Route path="/tasks" element={<Tasks />} />
           <Route path="/deals" element={<Deals />} />
