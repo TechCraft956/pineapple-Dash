@@ -24,6 +24,7 @@ services:
       - PINEAPPLE_RUNTIME_ROOT=/runtime/pineapple-ops-runtime
     volumes:
       - /Users/DdyFngr/Desktop/Projects/pineapple-ops-runtime:/runtime/pineapple-ops-runtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
       mongo:
         condition: service_healthy

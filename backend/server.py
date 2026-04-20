@@ -99,21 +99,43 @@ def _read_markdown(path: Path) -> str:
 
 
 def _docker_service_rows() -> list[dict]:
+    sock_path = "/var/run/docker.sock"
+    if not Path(sock_path).exists():
+        return []
     try:
         output = subprocess.check_output(
-            ["docker", "ps", "--format", "{{.Names}}\t{{.Status}}"],
+            [
+                "python",
+                "-c",
+                (
+                    "import json, socket; "
+                    "s=socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); "
+                    "s.settimeout(8); "
+                    "s.connect('/var/run/docker.sock'); "
+                    "s.sendall(b'GET /containers/json HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n'); "
+                    "chunks=[]; "
+                    "\nwhile True:\n"
+                    "  data=s.recv(65536)\n"
+                    "  if not data: break\n"
+                    "  chunks.append(data)\n"
+                    "body=b''.join(chunks).split(b'\\r\\n\\r\\n',1)[1]; "
+                    "print(body.decode('utf-8'))"
+                ),
+            ],
             text=True,
-            timeout=8,
+            timeout=10,
         )
+        parsed = json.loads(output)
     except Exception:
         return []
 
     rows: list[dict] = []
-    for line in output.splitlines():
-        if not line.strip():
+    for row in parsed:
+        name = (row.get("Names") or [""])[0].lstrip("/").strip()
+        status = (row.get("Status") or "").strip()
+        if not name:
             continue
-        name, _, status = line.partition("\t")
-        rows.append({"name": name.strip(), "status": status.strip()})
+        rows.append({"name": name, "status": status})
     return rows
 
 
