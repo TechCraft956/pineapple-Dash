@@ -17,6 +17,7 @@ import json
 import os
 import logging
 import subprocess
+import urllib.request
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Any, List, Optional, Literal
@@ -39,7 +40,7 @@ PINEAPPLE_QUEUE_FILE = STATE_DIR / "pineapple-queue.json"
 PINEAPPLE_ORDER_FILE = STATE_DIR / "pineapple-os-order.json"
 TASK_LIFECYCLE_FILE = STATE_DIR / "task-lifecycle.json"
 GENERATED_TASKS_FILE = STATE_DIR / "generated-tasks.json"
-LOCAL_TASK_LIFECYCLE_FILE = ROOT_DIR / ".runtime-cache" / "task-lifecycle.json"
+MARKETPLACE_API_BASE = os.environ.get("MARKETPLACE_API_BASE", "http://dealscope_api:8000")
 CANONICAL_STATE_CONTRACT_FILE = STATE_DIR / "canonical-state-contract.json"
 CANONICAL_OWNERSHIP_FILE = STATE_DIR / "ownership-map.json"
 
@@ -216,57 +217,12 @@ def _persist_generated_tasks(tasks: list[dict]) -> None:
 
 
 def _read_task_lifecycle() -> dict:
-    canonical = _read_json(TASK_LIFECYCLE_FILE, None)
-    if canonical is not None:
-        return canonical
-    return _read_json(LOCAL_TASK_LIFECYCLE_FILE, {"tasks": []})
-
-
-def _persist_task_lifecycle(tasks: list[dict]) -> None:
-    payload = {
-        "generated_at": now_iso(),
-        "count": len(tasks),
-        "tasks": tasks,
-    }
     try:
-        _write_json(TASK_LIFECYCLE_FILE, payload)
-    except OSError:
-        logger.warning("canonical task lifecycle file is not writable in dash runtime, using local cache")
-        _write_json(LOCAL_TASK_LIFECYCLE_FILE, payload)
-
-
-def _merge_generated_tasks(tasks: list[dict]) -> list[dict]:
-    current = _read_task_lifecycle()
-    existing = {item.get("task_id"): item for item in current.get("tasks", []) if item.get("task_id")}
-    merged = []
-    seen = set()
-    for task in tasks:
-        task_id = task.get("task_id")
-        prior = existing.get(task_id, {})
-        merged_task = {
-            "task_id": task_id,
-            "source": task.get("source"),
-            "action": task.get("action"),
-            "reason": task.get("reason"),
-            "priority": task.get("priority"),
-            "expected_outcome": task.get("expected_outcome"),
-            "confidence": task.get("confidence"),
-            "status": prior.get("status", "pending"),
-            "created_at": prior.get("created_at", task.get("timestamp") or now_iso()),
-            "updated_at": now_iso(),
-            "resolution": prior.get("resolution"),
-            "actual_outcome": prior.get("actual_outcome"),
-            "was_successful": prior.get("was_successful"),
-            "time_to_complete": prior.get("time_to_complete"),
-            "value_generated": prior.get("value_generated"),
-        }
-        merged.append(merged_task)
-        seen.add(task_id)
-    for task_id, prior in existing.items():
-        if task_id not in seen:
-            merged.append(prior)
-    _persist_task_lifecycle(merged)
-    return merged
+        with urllib.request.urlopen(f"{MARKETPLACE_API_BASE}/api/operator/task-lifecycle", timeout=8) as r:
+            return json.loads(r.read())
+    except Exception:
+        canonical = _read_json(TASK_LIFECYCLE_FILE, None)
+        return canonical if canonical is not None else {"tasks": []}
 
 
 def _generated_tasks(overview: dict, ingestion_records: list[dict]) -> list[dict]:
@@ -415,7 +371,7 @@ def _runtime_overview() -> dict:
         "ingestion_records": list(reversed(ingestion_records[-5:])),
     }
     overview["generated_tasks"] = _generated_tasks(overview, overview["ingestion_records"])
-    overview["task_lifecycle"] = _merge_generated_tasks(overview["generated_tasks"])
+    overview["task_lifecycle"] = (_read_task_lifecycle() or {}).get("tasks", [])
     _persist_generated_tasks(overview["generated_tasks"])
     return overview
 
@@ -1029,27 +985,18 @@ async def get_operator_overview():
 
 @api_router.put("/operator/tasks/{task_id}")
 async def update_operator_task(task_id: str, data: TaskLifecycleUpdate):
-    current = _read_task_lifecycle()
-    tasks = current.get("tasks", [])
-    for idx, task in enumerate(tasks):
-        if task.get("task_id") != task_id:
-            continue
-        task["status"] = data.status
-        task["updated_at"] = now_iso()
-        if data.resolution is not None:
-            task["resolution"] = data.resolution
-        if data.actual_outcome is not None:
-            task["actual_outcome"] = data.actual_outcome
-        if data.was_successful is not None:
-            task["was_successful"] = data.was_successful
-        if data.time_to_complete is not None:
-            task["time_to_complete"] = data.time_to_complete
-        if data.value_generated is not None:
-            task["value_generated"] = data.value_generated
-        tasks[idx] = task
-        _persist_task_lifecycle(tasks)
-        return task
-    raise HTTPException(status_code=404, detail="Operator task not found")
+    payload = json.dumps(data.model_dump()).encode()
+    req = urllib.request.Request(
+        f"{MARKETPLACE_API_BASE}/api/operator/task-lifecycle/{task_id}",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="PUT",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=8) as r:
+            return json.loads(r.read())
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Lifecycle writer unavailable: {exc}")
 
 
 # =============================================================================
